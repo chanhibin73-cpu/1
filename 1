@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>究極のオセロ - オンライン対戦対応</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- WebRTC通信用ライブラリ (PeerJS) -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+  <!-- メインメニュー -->
+  <div id="menu-screen" class="screen active">
+    <h1>オセロ</h1>
+    <div class="menu-card">
+      <button class="btn" onclick="startGame('pvp')">👥 2人対戦（ローカル）</button>
+      <button class="btn btn-online" onclick="showScreen('online-screen')">🌐 オンライン対戦</button>
+      <button class="btn" onclick="showDifficultySelect()">💻 コンピュータ対戦</button>
+      <button class="btn btn-secondary" onclick="showScreen('settings-screen')">⚙️ 設定</button>
+    </div>
+  </div>
+
+  <!-- オンライン対戦メニュー -->
+  <div id="online-screen" class="screen">
+    <h1>オンライン対戦</h1>
+    <div class="menu-card">
+      <div class="room-input-group">
+        <label for="room-number">4桁のルームナンバー</label>
+        <input type="number" id="room-number" placeholder="例: 1234" min="1000" max="9999">
+      </div>
+      <button class="btn btn-online" onclick="createRoom()">🏠 部屋を作成（先攻/黒）</button>
+      <button class="btn" onclick="joinRoom()">🚪 部屋に参加（後攻/白）</button>
+      <div id="online-status" class="online-status-text"></div>
+      
+      <!-- 待機中・接続中の解除ボタン -->
+      <button id="cancel-online-btn" class="btn btn-danger" onclick="cancelOnlineWaiting()" style="display: none;">❌ 部屋作成・接続を解除</button>
+      <button class="btn btn-secondary" onclick="showScreen('menu-screen')">戻る</button>
+    </div>
+  </div>
+
+  <!-- 難易度選択 -->
+  <div id="difficulty-screen" class="screen">
+    <h1>難易度を選択</h1>
+    <div class="menu-card">
+      <button class="btn" onclick="startGame('ai', 1)">初級 (ランダム)</button>
+      <button class="btn" onclick="startGame('ai', 2)">中級 (評価表)</button>
+      <button class="btn" onclick="startGame('ai', 3)">上級 (3手読み AI)</button>
+      <button class="btn btn-danger" onclick="startGame('ai', 4)">🔥 最強 (深層先読み)</button>
+      <button class="btn btn-ultra" onclick="startGame('ai', 5)">⚡ 超最強 (爆速・思考最適化)</button>
+      <button class="btn btn-secondary" onclick="showScreen('menu-screen')">戻る</button>
+    </div>
+  </div>
+
+  <!-- 設定画面 -->
+  <div id="settings-screen" class="screen">
+    <h1>設定</h1>
+    <div class="menu-card">
+      <div class="setting-group">
+        <label for="bgm-type-select">BGM の種類</label>
+        <select id="bgm-type-select" onchange="changeBGMType(this.value)">
+          <option value="pop">🎵 ポップ (標準)</option>
+          <option value="ambient">🌙 アンビエント (しっとり)</option>
+          <option value="8bit">👾 8-bit (Innocent World風)</option>
+        </select>
+      </div>
+
+      <div class="setting-group">
+        <label for="bg-color-select">背景色</label>
+        <select id="bg-color-select" onchange="changeBgColor(this.value)">
+          <option value="#2b3a42">ダークブルー</option>
+          <option value="#1a1a1a">シックブラック</option>
+          <option value="#3e2723">クラシックブラウン</option>
+          <option value="#1b4d3e">ディープグリーン</option>
+        </select>
+      </div>
+
+      <div class="setting-group">
+        <label for="bgm-volume">BGM 音量 (<span id="bgm-val">30</span>%)</label>
+        <input type="range" id="bgm-volume" min="0" max="100" value="30" oninput="updateVolume()">
+      </div>
+
+      <div class="setting-group">
+        <label for="se-volume">効果音 (SE) 音量 (<span id="se-val">70</span>%)</label>
+        <input type="range" id="se-volume" min="0" max="100" value="70" oninput="updateVolume()">
+      </div>
+
+      <button class="btn btn-secondary" onclick="showScreen('menu-screen')">保存して戻る</button>
+    </div>
+  </div>
+
+  <!-- ゲーム画面 -->
+  <div id="game-screen" class="screen">
+    <div class="status-panel">
+      <div id="black-score">黒: 2</div>
+      <div id="turn-display" class="turn-indicator active">黒の番</div>
+      <div id="white-score">白: 2</div>
+    </div>
+
+    <div class="board-container">
+      <div id="sync-overlay" class="sync-overlay">📡 通信中...</div>
+      <div id="thinking-badge" class="thinking-overlay">⚡ 超最強解析中...</div>
+      <div id="board" class="board"></div>
+      <div id="message-banner" class="message-banner"></div>
+    </div>
+
+    <div class="analysis-panel">
+      <div class="analysis-title">形勢アナライザー</div>
+      <div class="bar-container">
+        <div id="eval-bar" class="bar-black"></div>
+      </div>
+      <div id="eval-text" class="analysis-text">互角 (+0)</div>
+    </div>
+
+    <div class="nav-btns">
+      <button id="reset-btn" class="btn btn-secondary" onclick="resetGame()">やり直す</button>
+      <!-- オンラインプレイ中の対戦解除ボタン -->
+      <button id="leave-online-btn" class="btn btn-danger" onclick="leaveOnlineAndReturnMenu()" style="display: none;">🚫 対戦解除</button>
+      <button id="menu-btn" class="btn btn-secondary" onclick="showScreen('menu-screen')">メニューへ</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
