@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>入試日報新聞 - 共通テスト・大学入試情報自動まとめ</title>
+  <style>
+    /* レトロで視認性の高い新聞デザイン */
+    :root {
+      --paper-bg: #fdfbf7;
+      --paper-text: #111111;
+      --accent-red: #d9381e;
+      --border-color: #333333;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--paper-bg);
+      color: var(--paper-text);
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif;
+      line-height: 1.8;
+      padding-top: 70px;
+    }
+
+    /* 左上 カウントダウン (赤文字) */
+    .countdown-banner {
+      position: fixed;
+      top: 15px;
+      left: 15px;
+      color: var(--accent-red);
+      font-weight: bold;
+      font-size: 1.1rem;
+      z-index: 100;
+      background: rgba(253, 251, 247, 0.95);
+      padding: 6px 12px;
+      border: 2px solid var(--accent-red);
+      box-shadow: 2px 2px 0px var(--accent-red);
+      letter-spacing: 0.05em;
+    }
+
+    /* サイドメニュー開閉ボタン (三本線) */
+    .menu-trigger {
+      position: fixed;
+      top: 15px;
+      right: 15px;
+      width: 44px;
+      height: 44px;
+      background: #ffffff;
+      border: 2px solid var(--border-color);
+      font-size: 1.5rem;
+      cursor: pointer;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 2px 2px 0px var(--border-color);
+    }
+
+    /* サイドバー */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      right: -360px;
+      width: 340px;
+      height: 100%;
+      background: #ffffff;
+      border-left: 2px solid var(--border-color);
+      z-index: 150;
+      transition: right 0.3s ease;
+      padding: 80px 20px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -4px 0 10px rgba(0,0,0,0.1);
+      font-family: sans-serif;
+    }
+
+    .sidebar.open {
+      right: 0;
+    }
+
+    .sidebar h2 {
+      font-size: 1.1rem;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 5px;
+      margin-bottom: 15px;
+    }
+
+    .api-key-section {
+      margin-bottom: 20px;
+    }
+
+    .api-key-section input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      margin-top: 5px;
+      font-size: 0.85rem;
+    }
+
+    .save-btn {
+      margin-top: 8px;
+      width: 100%;
+      padding: 8px;
+      background: #222;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .save-btn:hover {
+      background: #444;
+    }
+
+    /* チャットエリア */
+    .chat-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      padding: 10px;
+      background: #f9f9f9;
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+    }
+
+    .chat-msg {
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      border-radius: 4px;
+      max-width: 90%;
+      line-height: 1.5;
+    }
+
+    .chat-msg.user {
+      background: #e1f5fe;
+      margin-left: auto;
+      color: #01579b;
+    }
+
+    .chat-msg.ai {
+      background: #ffffff;
+      border: 1px solid #ddd;
+      color: #222;
+    }
+
+    .chat-input-box {
+      display: flex;
+      gap: 5px;
+    }
+
+    .chat-input-box input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ccc;
+      font-size: 0.85rem;
+    }
+
+    /* 新聞レイアウト */
+    .newspaper-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .newspaper-header {
+      text-align: center;
+      border-bottom: 3px double var(--border-color);
+      padding-bottom: 15px;
+      margin-bottom: 25px;
+    }
+
+    .newspaper-title {
+      font-size: 2.8rem;
+      font-weight: 900;
+      letter-spacing: 0.2em;
+      margin-bottom: 10px;
+    }
+
+    .newspaper-meta {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-color);
+      padding: 5px 10px;
+      font-size: 0.85rem;
+    }
+
+    .latest-news {
+      border: 2px solid var(--border-color);
+      padding: 30px;
+      background: #ffffff;
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    .breaking-tag {
+      display: inline-block;
+      background: var(--accent-red);
+      color: #ffffff;
+      padding: 3px 10px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      margin-bottom: 12px;
+      font-family: sans-serif;
+    }
+
+    .latest-title {
+      font-size: 1.9rem;
+      line-height: 1.4;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 12px;
+      font-weight: bold;
+    }
+
+    .latest-subtext {
+      font-size: 0.95rem;
+      color: #555;
+      margin-bottom: 20px;
+      font-family: sans-serif;
+    }
+
+    .latest-body {
+      font-size: 1.05rem;
+      text-align: justify;
+      column-count: 2;
+      column-gap: 35px;
+      column-rule: 1px solid #ddd;
+    }
+
+    .latest-body p {
+      margin-bottom: 1em;
+      text-indent: 1em;
+    }
+
+    @media (max-width: 650px) {
+      .latest-body {
+        column-count: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 左上 カウントダウン (赤文字) -->
+  <div class="countdown-banner" id="countdownBanner">
+    共通テストまで残り -- 日
+  </div>
+
+  <!-- サイドメニュー開閉ボタン -->
+  <button class="menu-trigger" id="menuBtn">☰</button>
+
+  <!-- サイドメニュー (Gemini APIキー ＆ AIチャット) -->
+  <aside class="sidebar" id="sidebar">
+    <h2>入試AIアシスタント (Gemini 3.6 Flash)</h2>
+    
+    <div class="api-key-section">
+      <label style="font-size:0.8rem; color:#555;">Gemini APIキー登録</label>
+      <input type="password" id="apiKeyInput" placeholder="AI Studioのキーを入力">
+      <button class="save-btn" id="saveKeyBtn">キーを保存</button>
+      <div id="keyStatus" style="font-size:0.75rem; color:green; margin-top:4px;"></div>
+    </div>
+
+    <div class="chat-section">
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-msg ai">入試情報に関する質問を入力してください 記号なしでご回答いたします</div>
+      </div>
+      <div class="chat-input-box">
+        <input type="text" id="chatInput" placeholder="例: 共通テストの注意点">
+        <button class="save-btn" id="sendBtn" style="margin-top:0; width:60px;">送信</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- メイン画面 (最新の新聞記事のみ大きく表示) -->
+  <div class="newspaper-container">
+    <header class="newspaper-header">
+      <h1 class="newspaper-title">入試日報新聞</h1>
+      <div class="newspaper-meta">
+        <span>更新日: 2026年07月27日</span>
+        <span id="currentPaperDate">2026年07月27日 (月) 号</span>
+        <span>発行: 入試情報自動集約局</span>
+      </div>
+    </header>
+
+    <!-- 最新記事 -->
+    <main>
+      <article class="latest-news">
+        <span class="breaking-tag">定例速報</span>
+        <h2 class="latest-title">私立大学一般入試で倍率上昇が顕著 首都圏・近畿圏に志願者集中か</h2>
+        <div class="latest-subtext">大手予備校代々木ゼミナールおよび河合塾公表の最新2026年度入試総括より要約</div>
+        
+        <div class="latest-body">
+          <p>大手予備校の代々木ゼミナールおよび河合塾は、2026年度入試の確定結果および最新の分析データを公表いたしました。公表データによると、今年度の私立大学一般選抜における志願者総数は全国的に増加傾向を示し、前年度比で約32万人増の大幅な志願増加を記録いたしました。特に首都圏（関東地区）や近畿圏の大都市圏におきましては志願者の過半数が集中し、倍率の顕著な上昇が確認されております。</p>
+          <p>系統別では、環境系、歯学系、国際系学部・学科での志願者数が前年比で約3割増加するなど人気が高まった一方、共通テスト利用方式におきましても志願者が10万人規模で増加いたしました。共通テスト本試験の難化にともない、国公立大学の中後期日程志願者が減少傾向となった影響を受け、私立大学一般選抜への併願出願が増加したことが大きな要因と分析されております。</p>
+          <p>次年度受験を控える受験生におかれましては、特定地域の大学や人気系統への志願集中による激化を考慮し、模試判定のみに依存しない幅広い併願校選定と早期の対策が重要となります。</p>
+        </div>
+      </article>
+    </main>
+  </div>
+
+  <script>
+    // 1. カウントダウン機能 (2027年1月16日の共通テストまで)
+    function updateCountdown() {
+      const examDate = new Date("2027-01-16T00:00:00+09:00");
+      const now = new Date();
+      const diffTime = examDate - now;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const banner = id('countdownBanner');
+      if (diffDays > 0) {
+        banner.textContent = `共通テストまで残り ${diffDays} 日`;
+      } else {
+        banner.textContent = `共通テスト当日・終了`;
+      }
+    }
+
+    // 2. サイドメニュー開閉
+    const sidebar = id('sidebar');
+    id('menuBtn').onclick = () => {
+      sidebar.classList.toggle('open');
+    };
+
+    // 3. APIキー保存
+    const apiKeyInput = id('apiKeyInput');
+    const keyStatus = id('keyStatus');
+
+    const savedKey = localStorage.getItem('gemini_api_key') || '';
+    if (savedKey) {
+      apiKeyInput.value = savedKey;
+      keyStatus.textContent = "保存済みのAPIキーがあります";
+    }
+
+    id('saveKeyBtn').onclick = () => {
+      const key = apiKeyInput.value.trim();
+      if (key) {
+        localStorage.setItem('gemini_api_key', key);
+        keyStatus.textContent = "APIキーを保存しました";
+      } else {
+        localStorage.removeItem('gemini_api_key');
+        keyStatus.textContent = "キーを削除しました";
+      }
+    };
+
+    // 4. 記号排除用正規表現フィルター
+    function removeAllSymbols(str) {
+      return str.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/gu, '');
+    }
+
+    // 5. Gemini API呼び出し (gemini-3.6-flashモデル固定)
+    async function askGemini(promptText, apiKey) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+
+      const systemPrompt = `あなたは大学入試情報の専門AIアシスタントです
+質問に対して分かりやすく回答してください
+
+厳格な文字制約ルール
+1 アルファベット 数字 ひらがな カタカナ 漢字のみを使用してください
+2 句読点 記号 改行 絵文字 特殊文字は一切使用禁止です
+  使用禁止の例 句点 読点 感嘆符 疑問符 記号 カッコ ハイフン スラッシュなど
+3 文の区切りや文章の区切りには必ず半角スペースまたは全角スペースを使用してください`;
+
+      const payload = {
+        contents: [{
+          parts: [{ text: promptText }]
+        }],
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        }
+      };
+
+      let delays = [1000, 2000, 4000, 8000, 16000];
+      for (let i = 0; i <= delays.length; i++) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+          
+          const data = await response.json();
+          let aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "回答を取得できませんでした";
+          
+          return removeAllSymbols(aiText);
+        } catch (err) {
+          if (i === delays.length) {
+            return "通信エラーが発生しました 再度お試しください";
+          }
+          await new Promise(res => setTimeout(res, delays[i]));
+        }
+      }
+    }
+
+    // チャット送信処理
+    const chatInput = id('chatInput');
+    const chatMessages = id('chatMessages');
+
+    id('sendBtn').onclick = async () => {
+      const prompt = chatInput.value.trim();
+      const apiKey = localStorage.getItem('gemini_api_key');
+
+      if (!prompt) return;
+      if (!apiKey) {
+        appendChatMsg('ai', 'APIキーを上の入力欄に登録してください');
+        return;
+      }
+
+      appendChatMsg('user', prompt);
+      chatInput.value = '';
+
+      const loadingMsgEl = appendChatMsg('ai', '回答を作成中');
+
+      const answer = await askGemini(prompt, apiKey);
+      loadingMsgEl.textContent = answer;
+    };
+
+    function appendChatMsg(role, text) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `chat-msg ${role}`;
+      msgDiv.textContent = text;
+      chatMessages.appendChild(msgDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return msgDiv;
+    }
+
+    function id(elemId) { return document.getElementById(elemId); }
+
+    window.onload = () => {
+      updateCountdown();
+    };
+  </script>
+</body>
+</html>
+
