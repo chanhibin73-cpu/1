@@ -1,0 +1,30 @@
+name: Exam News Auto Collector
+
+on:
+  schedule:
+    # 定例号の深い検索: 火・木・土・日の前日(月,水,金,土)の 12:01 JST (UTC 03:01)
+    - cron: '1 3 * * 1,3,5,6'
+    # 速報のチェック: 3時間ごと実行 (UTC 0, 3, 6, 9, 12, 15, 18, 21)
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: ニュース収集スクリプトの実行
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          APP_ID: ${{ secrets.APP_ID }}
+        run: |
+          python scripts/collect_news.py
+
+
