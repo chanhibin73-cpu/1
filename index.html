@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>入試日報新聞 - 共通テスト・大学入試情報自動まとめ</title>
+  <style>
+    :root {
+      --paper-bg: #fdfbf7;
+      --paper-text: #111111;
+      --accent-red: #d9381e;
+      --border-color: #333333;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background-color: var(--paper-bg);
+      color: var(--paper-text);
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif;
+      line-height: 1.8;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    .top-spacer { height: 70px; }
+
+    /* 左上 カウントダウン (赤文字) */
+    .countdown-banner {
+      position: fixed; top: 15px; left: 15px; color: var(--accent-red);
+      font-weight: bold; font-size: 1.0rem; z-index: 100;
+      background: rgba(253, 251, 247, 0.95); padding: 6px 12px;
+      border: 2px solid var(--accent-red); box-shadow: 2px 2px 0px var(--accent-red);
+    }
+
+    /* 右上 三本線メニュー */
+    .menu-trigger {
+      position: fixed; top: 15px; right: 15px; width: 44px; height: 44px;
+      background: #ffffff; border: 2px solid var(--border-color); font-size: 1.5rem;
+      cursor: pointer; z-index: 200; display: flex; align-items: center; justify-content: center;
+      box-shadow: 2px 2px 0px var(--border-color);
+    }
+
+    /* サイドバー (AIチャットエリア) */
+    .sidebar {
+      position: fixed; top: 0; right: -360px; width: 340px; height: 100%;
+      background: #ffffff; border-left: 2px solid var(--border-color); z-index: 150;
+      transition: right 0.3s ease; padding: 80px 20px 20px 20px;
+      display: flex; flex-direction: column; box-shadow: -4px 0 10px rgba(0,0,0,0.1);
+      font-family: sans-serif;
+    }
+    .sidebar.open { right: 0; }
+    .sidebar h2 { font-size: 1.1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 5px; margin-bottom: 15px; }
+    .api-key-section input { width: 100%; padding: 8px; border: 1px solid #ccc; margin-top: 5px; font-size: 0.85rem; }
+    .save-btn { margin-top: 8px; width: 100%; padding: 8px; background: #222; color: #fff; border: none; cursor: pointer; font-size: 0.85rem; }
+    
+    .chat-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; margin-top: 10px;}
+    .chat-messages { flex: 1; overflow-y: auto; border: 1px solid #eee; padding: 10px; background: #f9f9f9; font-size: 0.85rem; margin-bottom: 10px; }
+    .chat-msg { margin-bottom: 12px; padding: 8px 10px; border-radius: 4px; max-width: 90%; line-height: 1.5; word-break: break-all;}
+    .chat-msg.user { background: #e1f5fe; margin-left: auto; color: #01579b; }
+    .chat-msg.ai { background: #ffffff; border: 1px solid #ddd; color: #222; }
+    .chat-input-box { display: flex; gap: 5px; }
+    .chat-input-box input { flex: 1; padding: 8px; border: 1px solid #ccc; font-size: 0.85rem; }
+
+    /* メイン新聞 UI */
+    .newspaper-container { max-width: 900px; margin: 0 auto; padding: 20px; padding-bottom: 60px; }
+    .newspaper-header { text-align: center; border-bottom: 3px double var(--border-color); padding-bottom: 15px; margin-bottom: 25px; }
+    .newspaper-title { font-size: 2.8rem; font-weight: 900; letter-spacing: 0.2em; margin-bottom: 10px; }
+    .newspaper-meta { display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 5px 10px; font-size: 0.85rem; }
+
+    /* 最新記事（大） */
+    .latest-news { border: 2px solid var(--border-color); padding: 30px; background: #ffffff; margin-bottom: 40px; }
+    .breaking-tag { display: inline-block; background: var(--accent-red); color: #ffffff; padding: 3px 10px; font-size: 0.85rem; font-weight: bold; margin-bottom: 12px; font-family: sans-serif; }
+    .latest-title { font-size: 1.9rem; line-height: 1.4; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 12px; font-weight: bold; }
+    .latest-body { font-size: 1.05rem; text-align: justify; column-count: 2; column-gap: 35px; column-rule: 1px solid #ddd; white-space: pre-wrap; word-break: break-all; }
+    @media (max-width: 650px) { .latest-body { column-count: 1; } }
+
+    /* アーカイブリスト（小） */
+    .archive-section { border-top: 2px solid var(--border-color); padding-top: 20px; }
+    .archive-heading { font-size: 1.2rem; margin-bottom: 15px; }
+    .archive-list { list-style: none; display: grid; gap: 10px; }
+    .archive-item { background: #ffffff; border: 1px solid #ccc; padding: 12px 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .archive-item:hover { background: #f0ede6; }
+    .archive-date { font-size: 0.85rem; color: #666; font-family: sans-serif; }
+    .archive-title { font-size: 0.95rem; font-weight: bold; }
+
+    /* 過去記事モーダル */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 300; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-content { background: var(--paper-bg); border: 2px solid var(--border-color); padding: 30px; max-width: 650px; width: 90%; max-height: 80vh; overflow-y: auto; position: relative; }
+    .modal-close { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // ユーザーから提供された実際のFirebase設定
+    const actualFirebaseConfig = {
+      apiKey: "AIzaSyAoYdHG7mJg-0oIocIw0uA97pURPJtTqUQ",
+      authDomain: "nyushi-nippo.firebaseapp.com",
+      projectId: "nyushi-nippo",
+      storageBucket: "nyushi-nippo.firebasestorage.app",
+      messagingSenderId: "376024106499",
+      appId: "1:376024106499:web:108b0a027015c782c97036"
+    };
+
+    // Canvas環境用の設定がある場合はそちらを使い、無ければ実際の設定を使用する
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : actualFirebaseConfig;
+    
+    // Firebase初期化
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    
+    // Pythonスクリプトで指定している保存先ID (app_id) と一致させます
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'nyushi-nippo-app';
+
+    async function initFirebase() {
+      try { 
+        await signInAnonymously(auth); 
+      } catch (e) { 
+        console.warn("Auth error:", e); 
+      }
+      
+      // コレクションのパス: artifacts / {appId} / public / data / articles
+      const articlesRef = collection(db, 'artifacts', appId, 'public', 'data', 'articles');
+      
+      onSnapshot(articlesRef, (snapshot) => {
+        const docs = [];
+        snapshot.forEach((doc) => docs.push({ id: doc.id, ...doc.data() }));
+        if (docs.length > 0) {
+          // 作成日順にソート（新しい順）
+          docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+          renderLatestArticle(docs[0]);
+          renderArchiveList(docs.slice(1));
+        } else {
+          document.getElementById('latestBody').textContent = "現在、記事はありません。";
+        }
+      }, (error) => {
+        console.error("Firestore読み込みエラー:", error);
+        document.getElementById('latestTitle').textContent = "データの取得に失敗しました";
+        document.getElementById('latestBody').textContent = "設定や権限を確認してください。";
+      });
+    }
+
+    function renderLatestArticle(article) {
+      document.getElementById('latestTag').textContent = article.isBreaking ? '【号外速報】' : '定例号';
+      document.getElementById('latestTag').style.backgroundColor = article.isBreaking ? 'var(--accent-red)' : '#333';
+      document.getElementById('latestTitle').textContent = article.title || '無題';
+      document.getElementById('latestBody').textContent = article.content || '';
+      document.getElementById('paperDateText').textContent = `${article.publishDate || ''} 発行`;
+    }
+
+    function renderArchiveList(archives) {
+      const listEl = document.getElementById('archiveList');
+      listEl.innerHTML = '';
+      if (archives.length === 0) { listEl.innerHTML = '<li style="color:#666;">過去の新聞はありません</li>'; return; }
+      
+      archives.forEach((article) => {
+        const li = document.createElement('li');
+        li.className = 'archive-item';
+        li.innerHTML = `<span class="archive-title">${article.isBreaking ? '【速報】' : ''}${article.title}</span><span class="archive-date">${article.publishDate || ''}</span>`;
+        li.onclick = () => window.openArticleModal(article);
+        listEl.appendChild(li);
+      });
+    }
+
+    window.openArticleModal = (article) => {
+      document.getElementById('modalDate').textContent = article.publishDate || '';
+      document.getElementById('modalTitle').textContent = (article.isBreaking ? '【号外速報】' : '') + article.title;
+      document.getElementById('modalBody').textContent = article.content || '';
+      document.getElementById('modalOverlay').classList.add('open');
+    };
+
+    window.addEventListener('DOMContentLoaded', initFirebase);
+  </script>
+</head>
+<body>
+
+  <!-- トップ固定用スペーサー -->
+  <div class="top-spacer"></div>
+
+  <!-- カウントダウン -->
+  <div class="countdown-banner" id="countdownBanner">共通テストまで残り -- 日</div>
+  <!-- 三本線メニュー -->
+  <button class="menu-trigger" id="menuBtn">☰</button>
+
+  <!-- サイドバー (AI) -->
+  <aside class="sidebar" id="sidebar">
+    <h2>入試AIアシスタント</h2>
+    <div class="api-key-section">
+      <label style="font-size:0.8rem; color:#555;">Gemini APIキー登録</label>
+      <input type="password" id="apiKeyInput" placeholder="キーを入力">
+      <button class="save-btn" id="saveKeyBtn">保存</button>
+      <div id="keyStatus" style="font-size:0.75rem; color:green; margin-top:4px;"></div>
+    </div>
+    <div class="chat-section">
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-msg ai">入試に関する質問をどうぞ 記号を一切使わずに回答します</div>
+      </div>
+      <div class="chat-input-box">
+        <input type="text" id="chatInput" placeholder="質問を入力">
+        <button class="save-btn" id="sendBtn" style="margin-top:0; width:60px;">送信</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- メイン新聞画面 -->
+  <div class="newspaper-container">
+    <header class="newspaper-header">
+      <h1 class="newspaper-title">入試日報新聞</h1>
+      <div class="newspaper-meta">
+        <span>定期発行: 火・木・土・日 / 速報随時</span>
+        <span id="paperDateText">読み込み中...</span>
+        <span>発行: 自動集約システム</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- 最新記事 (大きく表示) -->
+      <article class="latest-news">
+        <span class="breaking-tag" id="latestTag">読込中</span>
+        <h2 class="latest-title" id="latestTitle">最新の入試情報を取得しています</h2>
+        <div class="latest-body" id="latestBody">しばらくお待ちください。</div>
+      </article>
+
+      <!-- 過去記事 (リスト表示) -->
+      <section class="archive-section">
+        <h3 class="archive-heading">📰 過去の新聞一覧</h3>
+        <ul class="archive-list" id="archiveList"></ul>
+      </section>
+    </main>
+  </div>
+
+  <!-- モーダル -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content">
+      <span class="modal-close" id="modalClose">&times;</span>
+      <div class="archive-date" id="modalDate" style="color:#666; margin-bottom:10px;"></div>
+      <h2 class="latest-title" id="modalTitle" style="font-size:1.4rem;"></h2>
+      <div style="line-height:1.8; margin-top:15px; white-space:pre-wrap;" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    // 1. カウントダウン (2027年1月16日想定)
+    function updateCountdown() {
+      const diff = new Date("2027-01-16T00:00:00+09:00") - new Date();
+      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      document.getElementById('countdownBanner').textContent = days > 0 ? `共通テストまで残り ${days} 日` : `共通テスト終了`;
+    }
+    window.onload = updateCountdown;
+
+    // 2. サイドメニュー開閉
+    document.getElementById('menuBtn').onclick = () => document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('modalClose').onclick = () => document.getElementById('modalOverlay').classList.remove('open');
+
+    // 3. APIキー管理
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const keyStatus = document.getElementById('keyStatus');
+    if (localStorage.getItem('gemini_api_key')) {
+      apiKeyInput.value = localStorage.getItem('gemini_api_key');
+      keyStatus.textContent = "保存済";
+    }
+    document.getElementById('saveKeyBtn').onclick = () => {
+      const key = apiKeyInput.value.trim();
+      if (key) {
+        localStorage.setItem('gemini_api_key', key);
+        keyStatus.textContent = "保存しました";
+      } else {
+        localStorage.removeItem('gemini_api_key');
+        keyStatus.textContent = "削除しました";
+      }
+    };
+
+    // 4. 記号排除機能（アルファベット、数字、日本語、スペースのみ）
+    function removeSymbols(str) {
+      return str.replace(/[^a-zA-Z0-9\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/gu, ' ');
+    }
+
+    // 5. AIチャット送信
+    const chatInput = document.getElementById('chatInput');
+    const chatMessages = document.getElementById('chatMessages');
+
+    document.getElementById('sendBtn').onclick = async () => {
+      const prompt = chatInput.value.trim();
+      const apiKey = localStorage.getItem('gemini_api_key');
+      if (!prompt || !apiKey) return alert("APIキーと質問を入力してください");
+
+      const userDiv = document.createElement('div');
+      userDiv.className = 'chat-msg user'; userDiv.textContent = prompt;
+      chatMessages.appendChild(userDiv);
+      chatInput.value = '';
+
+      const aiDiv = document.createElement('div');
+      aiDiv.className = 'chat-msg ai'; aiDiv.textContent = '回答を作成中';
+      chatMessages.appendChild(aiDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            systemInstruction: { parts: [{ text: "あなたは入試AIです。記号や句読点は一切使わず、ひらがなカタカナ漢字英数字とスペースのみで答えてください" }] }
+          })
+        });
+        const data = await res.json();
+        let rawAnswer = data.candidates[0].content.parts[0].text;
+        aiDiv.textContent = removeSymbols(rawAnswer);
+      } catch (err) {
+        aiDiv.textContent = "通信エラーが発生しました";
+      }
+    };
+  </script>
+</body>
+</html>
+
+
