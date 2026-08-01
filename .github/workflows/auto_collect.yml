@@ -1,0 +1,39 @@
+name: Exam News Auto Collector
+
+on:
+  schedule:
+    # ----------------------------------------------------
+    # 定例発行分 (すべて JST 12:01 頃の発行を目指す設定)
+    # JST 12:01 は UTC 03:01 です
+    # ----------------------------------------------------
+    - cron: '1 3 * * 0' # 日曜発行分
+    - cron: '1 3 * * 2' # 火曜発行分
+    - cron: '1 3 * * 4' # 木曜発行分
+    - cron: '1 3 * * 6' # 土曜発行分
+    
+    # ----------------------------------------------------
+    # 速報（号外）検知用 (2時間ごとに実行)
+    # 定例時間以外は、AIが重大な速報と判断した場合のみ記事を作成します
+    # ----------------------------------------------------
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: ニュース収集スクリプトの実行
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          APP_ID: ${{ secrets.APP_ID }}
+        run: |
+          python scripts/collect_news.py
+
