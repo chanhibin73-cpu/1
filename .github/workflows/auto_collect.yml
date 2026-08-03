@@ -1,0 +1,47 @@
+name: Exam News Auto Collector
+
+on:
+  schedule:
+    # ----------------------------------------------------
+    # 定例発行分 (毎日 JST 午前11:00 に実行)
+    # JST 11:00 は UTC 02:00 になります。
+    # ----------------------------------------------------
+    - cron: '0 2 * * *'
+    
+    # ----------------------------------------------------
+    # リカバリー定例発行分 (毎日 JST 午後2:30 = 14:30 に実行)
+    # JST 14:30 は UTC 05:30 になります。
+    # 11時の発行が成功していれば、この時間はスキップされます。
+    # ----------------------------------------------------
+    - cron: '30 5 * * *'
+    
+    # ----------------------------------------------------
+    # 速報（号外）検知用 (2時間ごとに実行)
+    # ※11時・14時台以外の時間帯はAIが「重大な速報」と判断した場合のみ発行されます。
+    # ----------------------------------------------------
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 依存ライブラリのインストール
+        run: pip install firebase-admin
+
+      - name: ニュース収集スクリプトの実行
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          python collect_news.py
+
+
